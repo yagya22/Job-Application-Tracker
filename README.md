@@ -1,46 +1,62 @@
-# 🇩🇪 VisaTrack — Germany Visa Job Tracker
+# VisaTrack — Europe & Remote Job Tracker
 
-A full-stack web app to find and track visa-sponsored tech jobs in Germany.
+A full-stack web app to find and track visa-sponsored jobs in Europe and Remote.
 
 ---
 
 ## Features
 
-- **Live job scraping** — pulls from Arbeitnow (API), StepStone.de, and Indeed.de
-- **Visa sponsorship filter** — only surfaces roles that offer visa support
-- **Application tracker** — track status (Applied → Interview → Offer / Rejected), add notes
-- **7-day follow-up reminders** — in-app notifications + email digest for stale applications
+- **Live job search** — aggregates listings from 7 job boards simultaneously
+- **Visa sponsorship filter** — surfaces roles that offer visa support
+- **Manual application tracking** — track jobs you applied to from any career site or job board
+- **Application tracker** — status pipeline (Applied → Interview → Offer / Rejected), notes, applied date
 - **Two views** — table view and Kanban board
-- **DevOps-ready** — Dockerized, GitHub Actions CI/CD, health checks, non-root containers
+- **7-day follow-up reminders** — in-app notifications + email digest for stale applications
+- **In-app delete confirmation** — no browser dialogs, all interactions stay in-app
+- **Dark mode** — full dark/light theme support
+
+---
+
+## Job Sources
+
+| Source | Type |
+|--------|------|
+| Arbeitnow | Europe visa jobs API |
+| Adzuna | Germany jobs aggregator |
+| Jobicy | Remote jobs |
+| The Muse | International roles |
+| Remotive | Remote tech jobs |
+| RemoteOK | Remote jobs |
+| Working Nomads | Remote jobs |
 
 ---
 
 ## Tech Stack
 
-| Layer     | Tech                        |
-|-----------|-----------------------------|
+| Layer     | Tech |
+|-----------|------|
 | Frontend  | React 18 + Vite + Tailwind CSS |
-| Backend   | Node.js + Express           |
-| Database  | SQLite (via better-sqlite3) |
-| Scraping  | Axios + Cheerio             |
-| Email     | Nodemailer                  |
-| Scheduler | node-cron                   |
-| Container | Docker + Docker Compose     |
-| CI/CD     | GitHub Actions              |
+| Backend   | Node.js + Express |
+| Database  | PostgreSQL (via pg / node-postgres) |
+| Scraping  | Axios |
+| Email     | Nodemailer |
+| Scheduler | node-cron |
+| Hosting   | Render (backend + PostgreSQL + frontend) |
 
 ---
 
-## Getting Started (Local, no Docker)
+## Getting Started (Local)
 
 ### Prerequisites
 - Node.js 20+
 - npm
+- A PostgreSQL database (local install or a free cloud instance — Render, Neon, Supabase all work)
 
-### 1. Clone and set up
+### 1. Clone
 
 ```bash
-git clone <your-repo-url>
-cd visa-jobs-germany
+git clone https://github.com/yagya22/Job-Application-Tracker.git
+cd Job-Application-Tracker
 ```
 
 ### 2. Backend
@@ -48,7 +64,7 @@ cd visa-jobs-germany
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env — add your email credentials if you want email reminders
+# Edit .env — set DATABASE_URL and optionally email credentials
 npm install
 npm run dev
 # API running at http://localhost:4000
@@ -65,39 +81,70 @@ npm run dev
 
 ---
 
-## Getting Started (Docker Compose)
+## Environment Variables
 
-```bash
-# Copy and configure env
-cp backend/.env.example backend/.env
-# Edit backend/.env with your email settings
+### Backend (`backend/.env`)
 
-# Build and start everything
-docker-compose up --build
+```env
+PORT=4000
+NODE_ENV=development
 
-# App: http://localhost:3000
-# API: http://localhost:4000
+# PostgreSQL connection string
+DATABASE_URL=postgresql://user:password@localhost:5432/visajobs
+
+# Email reminders (optional — Gmail App Password)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=you@gmail.com
+EMAIL_PASS=your-16-char-app-password
+EMAIL_FROM=you@gmail.com
+EMAIL_TO=you@gmail.com
+
+# CORS
+CORS_ORIGINS=http://localhost:5173
+
+# Adzuna API (optional — free at developer.adzuna.com)
+ADZUNA_APP_ID=your_app_id
+ADZUNA_APP_KEY=your_app_key
+
+# Reminder schedule (default: 9am daily)
+REMINDER_CRON=0 9 * * *
+FOLLOW_UP_DAYS=7
 ```
 
-### Useful Docker commands
+### Frontend (`frontend/.env`)
 
-```bash
-# View logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
-
-# Restart a single service
-docker-compose restart backend
-
-# Stop without deleting data
-docker-compose down
-
-# Stop AND delete the SQLite volume (wipes all tracked jobs)
-docker-compose down -v
-
-# Inspect the SQLite volume path
-docker volume inspect visatrack_sqlite-data
+```env
+# Leave empty for local dev (proxied via Vite to /api)
+# Set to your Render backend URL when deploying
+VITE_API_URL=https://your-backend.onrender.com
 ```
+
+---
+
+## Deploying to Render
+
+### Backend (Web Service)
+1. Connect your GitHub repo in Render dashboard
+2. Set **Root Directory** to `backend`
+3. **Build Command**: `npm install`
+4. **Start Command**: `node src/index.js`
+5. Add all environment variables from `backend/.env.example`
+6. Set `DATABASE_URL` to the Internal Database URL from your Render PostgreSQL instance
+
+### Database (PostgreSQL)
+1. Create a new PostgreSQL instance on Render (free tier available)
+2. Copy the **Internal Database URL** into your backend's `DATABASE_URL` env var
+3. The schema is created automatically on first startup
+
+### Frontend (Static Site)
+1. Connect your GitHub repo in Render dashboard
+2. Set **Root Directory** to `frontend`
+3. **Build Command**: `npm install && npm run build`
+4. **Publish Directory**: `dist`
+5. Add env variable: `VITE_API_URL=https://your-backend-url.onrender.com`
+
+Render auto-deploys on every push to `main` — no CI/CD configuration needed.
 
 ---
 
@@ -106,24 +153,24 @@ docker volume inspect visatrack_sqlite-data
 ### Jobs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/jobs/search?title=&skills=` | Search visa jobs |
+| GET | `/api/jobs/search?title=&skills=` | Search visa jobs across all sources |
 | GET | `/api/health` | Health check |
 
 ### Tracker
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/tracker` | List all tracked jobs |
-| POST | `/api/tracker` | Add application |
-| PUT | `/api/tracker/:id` | Update status/notes |
+| GET | `/api/tracker` | List all tracked applications |
+| POST | `/api/tracker` | Add application manually |
+| PUT | `/api/tracker/:id` | Update status / notes |
 | DELETE | `/api/tracker/:id` | Remove application |
 
 ### Notifications
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/notifications` | Get all notifications |
+| GET | `/api/notifications` | Get notifications (fetched on bell open) |
 | PUT | `/api/notifications/:id/read` | Mark one as read |
 | PUT | `/api/notifications/read-all` | Mark all as read |
-| POST | `/api/notifications/trigger` | Manually trigger reminder check |
+| POST | `/api/notifications/trigger` | Manually trigger follow-up check |
 
 ---
 
@@ -132,34 +179,7 @@ docker volume inspect visatrack_sqlite-data
 1. Enable 2FA on your Gmail account
 2. Go to Google Account → Security → App Passwords
 3. Create an app password (select "Mail")
-4. Add to `backend/.env`:
-
-```env
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=you@gmail.com
-EMAIL_PASS=your-16-char-app-password
-EMAIL_TO=you@gmail.com
-```
-
----
-
-## CI/CD Pipeline (GitHub Actions)
-
-The pipeline at `.github/workflows/ci.yml`:
-
-1. **On every push/PR**: lint frontend build
-2. **On merge to `main`**: build Docker images + push to GitHub Container Registry (GHCR)
-
-### Setup
-
-1. Push this repo to GitHub
-2. Go to Settings → Actions → General → set Workflow permissions to "Read and write"
-3. The `GITHUB_TOKEN` secret is auto-provided — no setup needed for GHCR
-
-Images will be pushed to:
-- `ghcr.io/YOUR_USERNAME/visatrack-backend:latest`
-- `ghcr.io/YOUR_USERNAME/visatrack-frontend:latest`
+4. Add the 16-character password to `EMAIL_PASS` in your `.env`
 
 ---
 
@@ -169,44 +189,46 @@ Images will be pushed to:
 visa-jobs-germany/
 ├── backend/
 │   ├── src/
-│   │   ├── db/database.js          # SQLite setup + schema
+│   │   ├── db/database.js          # PostgreSQL pool + schema init
 │   │   ├── routes/
 │   │   │   ├── jobs.js             # /api/jobs
 │   │   │   ├── tracker.js          # /api/tracker
 │   │   │   └── notifications.js    # /api/notifications
 │   │   ├── scrapers/
-│   │   │   ├── arbeitnow.js        # Primary: free Germany visa API
-│   │   │   ├── stepstone.js        # StepStone.de scraper
-│   │   │   ├── indeed.js           # Indeed.de scraper
+│   │   │   ├── arbeitnow.js
+│   │   │   ├── adzuna.js
+│   │   │   ├── jobicy.js
+│   │   │   ├── themuse.js
+│   │   │   ├── remotive.js
+│   │   │   ├── remoteok.js
+│   │   │   ├── workingnomads.js
 │   │   │   └── index.js            # Orchestrator + deduplication
 │   │   ├── services/
-│   │   │   ├── emailService.js     # Nodemailer email sender
-│   │   │   └── reminderService.js  # Cron-based follow-up checker
-│   │   └── index.js                # Express app + server
-│   ├── Dockerfile
+│   │   │   ├── emailService.js     # Nodemailer digest sender
+│   │   │   └── reminderService.js  # Cron follow-up checker
+│   │   └── index.js                # Express app entry point
 │   ├── .env.example
 │   └── package.json
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── api/index.js            # All API calls
-│   │   ├── hooks/useNotifications  # Notification polling hook
+│   │   ├── api/index.js            # Axios instance + all API calls
+│   │   ├── hooks/
+│   │   │   └── useNotifications.js # Fetch on mount + bell open
 │   │   ├── components/
 │   │   │   ├── Navbar.jsx          # Nav + notification bell
 │   │   │   ├── JobCard.jsx         # Search result card
-│   │   │   ├── AddJobModal.jsx     # Manual job add form
-│   │   │   └── EditJobModal.jsx    # Status/notes editor
+│   │   │   ├── AddJobModal.jsx     # Manual application form
+│   │   │   └── EditJobModal.jsx    # Status / notes editor
 │   │   ├── pages/
-│   │   │   ├── Search.jsx          # Job search page
-│   │   │   └── Tracker.jsx         # Application tracker dashboard
+│   │   │   ├── Search.jsx          # Job search + manual track entry
+│   │   │   └── Tracker.jsx         # Application dashboard (table + kanban)
+│   │   ├── contexts/
+│   │   │   └── ThemeContext.jsx    # Dark / light mode
 │   │   ├── App.jsx
 │   │   └── main.jsx
-│   ├── Dockerfile
-│   ├── nginx.conf
 │   └── package.json
 │
-├── .github/workflows/ci.yml        # GitHub Actions CI/CD
-├── docker-compose.yml
 └── README.md
 ```
 
@@ -214,28 +236,15 @@ visa-jobs-germany/
 
 ## Adding More Job Sources
 
-To add a new scraper, create `backend/src/scrapers/newsite.js` following the same pattern as `arbeitnow.js`, then import and add it to `backend/src/scrapers/index.js`:
+Create `backend/src/scrapers/newsite.js` following the same pattern as the existing scrapers, then register it in `backend/src/scrapers/index.js`:
 
 ```js
 const { scrapeNewSite } = require("./newsite");
 
-// In scrapeAll():
-const [arbeitnowJobs, stepstoneJobs, indeedJobs, newSiteJobs] = await Promise.allSettled([
+// Inside scrapeAll():
+const results = await Promise.allSettled([
   scrapeArbeitnow(title, skills),
-  scrapeStepstone(title, skills),
-  scrapeIndeed(title, skills),
-  scrapeNewSite(title, skills),   // ← add here
+  // ... existing scrapers
+  scrapeNewSite(title, skills),  // ← add here
 ]);
 ```
-
----
-
-## Future Improvements
-
-- [ ] Add PostgreSQL for production (replace SQLite)
-- [ ] Add authentication (Supabase or Passport.js)
-- [ ] Puppeteer/Playwright scraper for JS-heavy sites
-- [ ] LinkedIn Jobs integration (requires OAuth)
-- [ ] Prometheus metrics endpoint for SRE monitoring
-- [ ] Kubernetes manifests (Helm chart)
-- [ ] Deployment to Hetzner Cloud / DigitalOcean
