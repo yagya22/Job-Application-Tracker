@@ -1,0 +1,77 @@
+###############################################################################
+# VisaTrack — Germany Visa Jobs Tracker
+# Docker Compose configuration for local development AND production
+#
+# Usage:
+#   Local dev (with hot reload):   docker-compose up
+#   Production build:              docker-compose -f docker-compose.yml up --build
+#   Stop:                          docker-compose down
+#   Stop + wipe volumes:           docker-compose down -v
+###############################################################################
+
+services:
+
+  # ─── Backend: Node.js/Express API ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: visatrack-backend
+    restart: unless-stopped
+
+    # Load environment variables from .env file (copy backend/.env.example → backend/.env)
+    env_file:
+      - ./backend/.env
+
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # The CORS origin must match where the frontend is served from
+      CORS_ORIGINS: http://localhost:3000
+
+    ports:
+      # Expose directly for local debugging/curl testing
+      - "4000:4000"
+
+    volumes:
+      # Persist the SQLite database across container restarts
+      - sqlite-data:/app/data
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    networks:
+      - visatrack-net
+
+  # ─── Frontend: React → Nginx ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: visatrack-frontend
+    restart: unless-stopped
+
+    ports:
+      - "3000:80"
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - visatrack-net
+
+# ─── Volumes ────────────────────────────────────────────────────────────────
+volumes:
+  sqlite-data:
+    driver: local
+    # Data lives at: docker volume inspect visatrack_sqlite-data
+
+# ─── Networks ───────────────────────────────────────────────────────────────
+networks:
+  visatrack-net:
+    driver: bridge

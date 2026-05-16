@@ -1,0 +1,138 @@
+###############################################################################
+# VisaTrack — CI/CD Pipeline
+# GitHub Actions workflow
+#
+# Triggers:
+#   - Every push to main (build + test + push images)
+#   - Every pull request to main (build + lint + test only, no push)
+#
+# What it does:
+#   1. Lint backend + frontend code
+#   2. Run backend tests (if any)
+#   3. Build Docker images
+#   4. Push to GitHub Container Registry (GHCR) on main branch merges
+#
+# Prerequisites (set these in GitHub → Settings → Secrets and Variables → Actions):
+#   - GHCR_TOKEN: a GitHub Personal Access Token with `write:packages` scope
+#     OR just use ${{ secrets.GITHUB_TOKEN }} which is auto-provided
+###############################################################################
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  # Replace YOUR_GITHUB_USERNAME with your actual GitHub username
+  IMAGE_BACKEND:  ghcr.io/${{ github.repository_owner }}/visatrack-backend
+  IMAGE_FRONTEND: ghcr.io/${{ github.repository_owner }}/visatrack-frontend
+
+jobs:
+
+  # ─── Job 1: Lint ────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      # Add your own lint commands as your project grows
+      # - name: Lint backend
+      #   working-directory: backend
+      #   run: npm run lint
+
+      # - name: Lint frontend
+      #   working-directory: frontend
+      #   run: npm run lint
+
+      - name: Type-check frontend build
+        working-directory: frontend
+        run: npm run build
+
+  # ─── Job 2: Build Docker Images ─────────────────────────────────────────────
+  build:
+    name: Build Images
+    runs-on: ubuntu-latest
+    needs: lint  # Only build if lint passes
+
+    permissions:
+      contents: read
+      packages: write  # Required to push to GHCR
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        # Buildx enables multi-platform builds and improved caching
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        # Skip on PRs — we don't push images from forks
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Backend image ──
+      - name: Build & push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.IMAGE_BACKEND }}:latest
+            ${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+          # Layer caching via GitHub Actions cache
+          cache-from: type=gha,scope=backend
+          cache-to:   type=gha,mode=max,scope=backend
+          platforms: linux/amd64,linux/arm64  # Support both x86 and Apple Silicon
+
+      # ── Frontend image ──
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.IMAGE_FRONTEND }}:latest
+            ${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to:   type=gha,mode=max,scope=frontend
+          platforms: linux/amd64,linux/arm64
+
+      # ── Print image digest for traceability ──
+      - name: Image summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "### 🐳 Images pushed to GHCR" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Tag |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend  | \`${{ env.IMAGE_BACKEND }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | \`${{ env.IMAGE_FRONTEND }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY

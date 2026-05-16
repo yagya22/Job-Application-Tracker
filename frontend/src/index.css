@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'DM Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-[#f0f4f8] dark:bg-gray-950 text-ink dark:text-gray-100;
+    min-height: 100vh;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  * { box-sizing: border-box; }
+}
+
+@layer components {
+  /* Status badges */
+  .badge-applied   { @apply bg-sky-50   dark:bg-sky-950/60   text-sky-700   dark:text-sky-300   border border-sky-200   dark:border-sky-800; }
+  .badge-interview { @apply bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800; }
+  .badge-offer     { @apply bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800; }
+  .badge-rejected  { @apply bg-red-50   dark:bg-red-950/60   text-red-700   dark:text-red-300   border border-red-200   dark:border-red-800; }
+  .badge-sponsored { @apply bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800; }
+  .badge-check     { @apply bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800; }
+
+  /* Buttons */
+  .btn-primary {
+    @apply bg-ink dark:bg-white text-white dark:text-ink font-display font-semibold text-sm px-5 py-2.5
+           rounded-lg hover:bg-navy dark:hover:bg-gray-100 transition-colors duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-white dark:bg-gray-800 text-ink dark:text-gray-100 border border-gray-200 dark:border-gray-700
+           font-display font-semibold text-sm px-5 py-2.5 rounded-lg
+           hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150;
+  }
+
+  /* Input */
+  .input-field {
+    @apply w-full border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm
+           text-ink dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500
+           bg-white dark:bg-gray-800 focus:outline-none focus:ring-2
+           focus:ring-ink/10 dark:focus:ring-white/10
+           focus:border-ink dark:focus:border-gray-500
+           transition-all duration-150;
+  }
+
+  /* Card */
+  .card {
+    @apply bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-card;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-300 dark:bg-gray-700 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-400 dark:bg-gray-600; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.animate-fade-up   { animation: fadeUp 0.25s ease both; }
+.animate-pulse-soft { animation: pulseSoft 2s ease-in-out infinite; }
+
+.job-card:nth-child(1) { animation-delay: 0ms; }
+.job-card:nth-child(2) { animation-delay: 40ms; }
+.job-card:nth-child(3) { animation-delay: 80ms; }
+.job-card:nth-child(4) { animation-delay: 120ms; }
+.job-card:nth-child(5) { animation-delay: 160ms; }
+.job-card:nth-child(6) { animation-delay: 200ms; }
