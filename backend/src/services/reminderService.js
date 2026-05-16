@@ -1,5 +1,5 @@
 const cron = require("node-cron");
-const db   = require("../db/database");
+const { pool } = require("../db/database");
 const { sendDigestEmail } = require("./emailService");
 
 const FOLLOW_UP_DAYS = parseInt(process.env.FOLLOW_UP_DAYS) || 7;
@@ -15,13 +15,17 @@ function start() {
 }
 
 async function checkFollowUps() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - FOLLOW_UP_DAYS);
+
   try {
-    const staleJobs = db.prepare(
+    const { rows: staleJobs } = await pool.query(
       `SELECT * FROM tracked_jobs
        WHERE status IN ('applied', 'interview')
          AND follow_up_sent = 0
-         AND datetime(applied_date) <= datetime('now', '-${FOLLOW_UP_DAYS} days')`
-    ).all();
+         AND applied_date <= $1`,
+      [cutoff.toISOString()]
+    );
 
     if (!staleJobs.length) {
       console.log("[Reminder] No stale applications found.");
@@ -30,23 +34,31 @@ async function checkFollowUps() {
 
     console.log(`[Reminder] Found ${staleJobs.length} stale application(s).`);
 
-    const insertNotif = db.prepare(
-      "INSERT INTO notifications (job_id, message, type) VALUES (?, ?, 'follow_up')"
-    );
-    const markSent = db.prepare("UPDATE tracked_jobs SET follow_up_sent = 1 WHERE id = ?");
-
-    const insertMany = db.transaction((jobs) => {
-      for (const job of jobs) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const job of staleJobs) {
         const daysSince = Math.floor(
           (Date.now() - new Date(job.applied_date).getTime()) / (1000 * 60 * 60 * 24)
         );
         const message = `No update on your application to ${job.company} (${job.role}) — ${daysSince} days since you applied.`;
-        insertNotif.run([job.id, message]);
-        markSent.run([job.id]);
+        await client.query(
+          "INSERT INTO notifications (job_id, message, type) VALUES ($1, $2, 'follow_up')",
+          [job.id, message]
+        );
+        await client.query(
+          "UPDATE tracked_jobs SET follow_up_sent = 1 WHERE id = $1",
+          [job.id]
+        );
       }
-    });
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
 
-    insertMany(staleJobs);
     sendDigestEmail(staleJobs).catch(() => {});
   } catch (err) {
     console.error("[Reminder] Error during follow-up check:", err.message);

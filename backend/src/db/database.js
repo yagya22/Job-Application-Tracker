@@ -1,8 +1,17 @@
 const { Pool } = require("pg");
 
+if (!process.env.DATABASE_URL) {
+  console.error("[DB] ERROR: DATABASE_URL is not set. Add it to your .env file.");
+  console.error("[DB] Example: DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/visajobs");
+  process.exit(1);
+}
+
+const isLocalDB = process.env.DATABASE_URL.includes("localhost") ||
+                  process.env.DATABASE_URL.includes("127.0.0.1");
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl: isLocalDB ? false : { rejectUnauthorized: false },
 });
 
 async function initDB() {

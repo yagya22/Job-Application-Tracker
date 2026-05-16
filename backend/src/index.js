@@ -7,6 +7,7 @@ const jobsRoute          = require("./routes/jobs");
 const trackerRoute       = require("./routes/tracker");
 const notificationsRoute = require("./routes/notifications");
 const reminderService    = require("./services/reminderService");
+const { initDB }         = require("./db/database");
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -58,12 +59,13 @@ app.use((err, _req, res, _next) => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 Visa Jobs API running on http://localhost:${PORT}`);
-  console.log(`   Health check: http://localhost:${PORT}/api/health\n`);
-});
-
-// Start cron-based reminder service
-reminderService.start();
+(async () => {
+  await initDB();
+  app.listen(PORT, () => {
+    console.log(`\n🚀 Visa Jobs API running on http://localhost:${PORT}`);
+    console.log(`   Health check: http://localhost:${PORT}/api/health\n`);
+  });
+  reminderService.start();
+})();
 
 module.exports = app;

@@ -7,7 +7,7 @@ import { useTheme } from "../contexts/ThemeContext";
 export default function Navbar() {
   const location = useLocation();
   const { dark, toggle } = useTheme();
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
   const [bellOpen,   setBellOpen]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const bellRef   = useRef(null);
@@ -86,7 +86,7 @@ export default function Navbar() {
           {/* Notification bell */}
           <div className="relative" ref={bellRef}>
             <button
-              onClick={() => setBellOpen((o) => !o)}
+              onClick={() => { const next = !bellOpen; setBellOpen(next); if (next) refresh(); }}
               className="relative p-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
               aria-label="Notifications"
             >

@@ -1,35 +1,37 @@
 const express = require("express");
-const db      = require("../db/database");
+const { pool } = require("../db/database");
 const { checkFollowUps } = require("../services/reminderService");
 
 const router = express.Router();
 
 /** GET /api/notifications */
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    const notifications = db.prepare(
+    const { rows: notifications } = await pool.query(
       `SELECT n.*, t.company, t.role, t.status
        FROM notifications n
        LEFT JOIN tracked_jobs t ON t.id = n.job_id
        ORDER BY n.created_at DESC LIMIT 50`
-    ).all();
-    const unreadCount = db.prepare("SELECT COUNT(*) as count FROM notifications WHERE read = 0").get().count;
-    res.json({ success: true, unreadCount, notifications });
+    );
+    const { rows: countRows } = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM notifications WHERE read = 0"
+    );
+    res.json({ success: true, unreadCount: countRows[0].count, notifications });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 /** PUT /api/notifications/:id/read */
-router.put("/:id/read", (req, res) => {
+router.put("/:id/read", async (req, res) => {
   try {
-    db.prepare("UPDATE notifications SET read = 1 WHERE id = ?").run([req.params.id]);
+    await pool.query("UPDATE notifications SET read = 1 WHERE id = $1", [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 /** PUT /api/notifications/read-all */
-router.put("/read-all", (req, res) => {
+router.put("/read-all", async (req, res) => {
   try {
-    db.prepare("UPDATE notifications SET read = 1").run();
+    await pool.query("UPDATE notifications SET read = 1");
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

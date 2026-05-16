@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from "../api";
 
-const POLL_INTERVAL = 30_000; // 30 seconds
-
 export function useNotifications() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount]     = useState(0);
@@ -18,11 +16,8 @@ export function useNotifications() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  // Fetch once on mount to populate the unread badge
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
   const markRead = async (id) => {
     await markNotificationRead(id);
